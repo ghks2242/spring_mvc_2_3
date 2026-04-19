@@ -60,7 +60,7 @@ public class ValidationItemControllerV1 {
         }
 
         // 특정필드가 아닌 복합 룰 검증
-        if (item.getPrice() == null && item.getQuantity() == null) {
+        if (item.getPrice() != null && item.getQuantity() != null) {
             int resultPrice = item.getPrice() * item.getQuantity();
             if (resultPrice < 10000) {
                 errors.put("globalError", "가격 * 수량의 합은 10,000원 이상이어야합니다. 현재 값 = " + resultPrice);
