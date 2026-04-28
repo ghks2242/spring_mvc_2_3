@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.ValidationUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -192,12 +193,16 @@ public class ValidationItemControllerV2 {
 //        Map<String, String> errors = new HashMap<>();
         // -> errors 역할을 bindingResult 가 수행한다
 
+        // 이거와 아래에 로직이 같다 해당하는 유틸은 empty 와 공백같은 단순한기능만제공
+//        ValidationUtils.rejectIfEmptyOrWhitespace(bindingResult, "itemName", "required");
+
         // 검증로직
         if (!StringUtils.hasText(item.getItemName())) {
 //            errors.put("itemName", "상품 이름은 필수입니다.");
 //            bindingResult.addError(new FieldError("item", "itemName", item.getItemName(),false, new String[]{"required.item.itemName"}, null, null));
             bindingResult.rejectValue("itemName", "required");
         }
+
         if (item.getPrice() == null || item.getPrice() < 1000 || item.getPrice() > 1000000) {
 //            errors.put("price", "가격은 1,000 ~ 1,000,000 까지 허용합니다.");
 //            bindingResult.addError(new FieldError("item", "price", item.getPrice(), false, new String[]{"range.item.price"}, new Object[]{1000, 1000000}, null));

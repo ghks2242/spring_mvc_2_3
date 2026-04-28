@@ -158,3 +158,13 @@ MessageCodesResolverTest 참고
 3. : code + "." + field type
 4. : code
 ```
+
+## 핵심은 구체적인것에서 덜 구체적인 것으로
+MessageCodesResolver 는 required.item.itemName 처럼 구체적인 것을 먼저 만들어주고 required 처럼 덜구체적인 것을 가장나중에만든다.
+이렇게 하면 앞서말한것처럼 메시지와 관련된 공통전략을 편리하게 도입할수있다.
+
+# 정리
+* rejectValue() 호출
+* MessageCodesResolver 를 사용해서 검증오류 코드로 메시지 코드를 생성
+* new FieldError() 를 생성하면서 메시지 코드들을 보관
+* th:errors 에서 메시지 코드들로 메시지를 순서대로 찾고 노출
