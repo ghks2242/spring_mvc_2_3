@@ -1,5 +1,11 @@
 검증
 ---
+클라이언트 검증과 서버검증
+* 클라이언트 검증은 조작할수있으므로 보안에 취약하다
+* 서버만으로 검증하면, 즉각적인 고객사용성이 부족하다
+* 둘을적절히 섞어서 사용하되, 최종적으로 서버검증은필수이다.
+* API 방식을 사용하면 API스펙을 잘 정의해서 검증 오류를 API 응답결과에 잘남겨주어야한다
+
 # 스프링에서 제공하는 검증오류 처리방법 
 
 ## BindingResult
@@ -168,3 +174,75 @@ MessageCodesResolver 는 required.item.itemName 처럼 구체적인 것을 먼�
 * MessageCodesResolver 를 사용해서 검증오류 코드로 메시지 코드를 생성
 * new FieldError() 를 생성하면서 메시지 코드들을 보관
 * th:errors 에서 메시지 코드들로 메시지를 순서대로 찾고 노출
+
+### 스프링이 기본적으로 만들어주는 에러메시지
+스프링은 타입오류가 발생하면 typeMismatch 라는 오류코드를 사용한다. 이 오류코드가 MessageCodesResolver를 통하면서 
+4가지 메시지코드가 생성된다
+* typeMismatch.item.price
+* typeMismatch.price
+* typeMismatch.java.lang.Integer
+* typeMismatch
+
+실행하면 
+```
+default message [Failed to convert property value of type 'java.lang.String' to required type 'java.lang.Integer' for property 'price'; nested exception is java.lang.NumberFormatException: For input string: "ㅂㅂㅂ"]
+```
+해당하는 디폴트메시지가 뜨는데 마찬가지로 error.properties 에
+```
+typeMismatch.java.lang.Integer=숫자를 입력해주세요.
+typeMismatch=타입 오류입니다.
+```
+를 추가하면 원하는 메시지로 설정할수있다. 
+
+
+--- 
+#  Validator 분리
+스프링은 검증을 체계적으로 제공하기위해 다음 인터페이스를 제공한다.
+```java
+public interface Validator {
+	boolean supports(Class<?> clazz);
+	void validate(Object target, Errors errors);
+}
+```
+* supports : 해당 검증기를 지원하는 여부 확인
+* validate : 검증대상객체와 bindingResult
+
+addItemV5 로 변경해보았다.
+사실상 
+```java 
+public class ItemValidator implements Validator  
+    //이부분에서 Validator 를 상속 안받아도 해당동작들은 잘수행될것이다 하지만 이다음 빈벨리데이션에서 그 이유가있다
+``` 
+
+
+### Validator 분리2
+스프링의 Validator 인터페이스를 별도로 제공하는 이유는 체계적으로 검증기능을 도입하기위해서이다 그런데 앞에서는 검증기를 직접불러서 사용햇고, 이렇게사용해도된다.
+그런데 Validator 인터페이스를 사용해서 검증기를 만들면 스프링의 추가도움을받을수있다
+
+```java 
+@InitBinder
+    public void init(WebDataBinder dataBinder) {
+        dataBinder.addValidators(itemValidator);
+    }
+```
+이렇게 WebDataBinder 에 검증기를 추가하면 해당 컨트롤러에서는 검증기를 자동으로 적용할수있다.
+@InitBinder 는 해당 컨트롤러에만 영향을 준다. 글로벌 설정은
+
+```
+WebMvcConfigurer 을 인터페이스받고 
+
+@Override
+public Validator getValidator() {
+  return new ItemValidator();
+} 
+```
+이렇게 적용하면 글로벌 설정이된다 글로벌설정도 아래작동방식과 같다.
+
+이후 컨트롤러에 @Validated 어노테이션만 추가하면 검증을 자동으로 적용한다
+-> 동작방식  
+```
+@Validated 는 검증기를 실행하라는 어노테이션이다.
+이 어노테이션이 붙으면 앞서 WebDataBinder 에 등록한 검증기를 찾아서 실행한다. 그런데 여러 검증기를 등록한다면 
+그중에 어떤 검증기가 실행되어야 할지 구분이 필요하다 이때 supports() 가 사용된다 여기서 supports(Item,class....) 가 호출되고
+결과가 true 이므로 validate() 가 호출된다. 
+```
