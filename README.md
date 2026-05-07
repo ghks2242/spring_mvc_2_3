@@ -246,3 +246,80 @@ public Validator getValidator() {
 그중에 어떤 검증기가 실행되어야 할지 구분이 필요하다 이때 supports() 가 사용된다 여기서 supports(Item,class....) 가 호출되고
 결과가 true 이므로 validate() 가 호출된다. 
 ```
+
+---
+# BeanValidation 이란?
+먼저 BeanValidation 은 특정한 구현체가 아니라 BeanValidation 2.0 이라는 기술표준이다. 
+쉽게 이야기해서 검증 어노테이션과 여러 인터페이스의 모음이다. 마치 JPA 가 표준기술이고 그 구현체로 하이버네이트가 있는 것과 같다.
+BeanValidation 을 구현한 기술중에 일반적으로 사용하는 구현체는 하이버네이트 Validation 이다 이름이 하이버네이트 가 붙어서그렇지 ORM 과는 관련없다
+
+** javax.validation 으로 시작하면 특정구현 관계없이 제공되는 표준인터페이스고 org.hibernate.validator 로 시작하면 
+하이버네이트 validator 구현체를 사용할때만 제공되는 검증기능이다. 
+
+
+
+--- 
+# 스프링 MVC 에서 BeanValidator 사용
+스프링부트가 ```implementation 'org.springframework.boot:spring-boot-starter-validation'``` 이 
+라이브러리를 넣으면 자동으로 BeanValidator 를 인지하고 스프링에 통합한다.
+
+LocalValidatorFactoryBean 을 글로벌 Validator 로 등록한다 @NotNull 같은 어노테이션을 보고 검증을 수행한다
+이렇게 글로벌 Validator 가 적용되어있기 때문에 @Valid, @Validated 만 적용하면된다.
+검증오류가 발생하면 FieldError, ObjectError 를 생성해서 BindingResult에 담아준다.
+
+!!주의!!
+````
+글로벌 Validator를 직접 등록하면 스프링부트는 BeanValidator를 글로벌 Validator 로 등록하지않는다 
+따라서 어노테이션 기반의 빈검증기가 동작하지않는다.
+````
+
+## 참고
+검증시 @Validated, @Valid 둘다 사용가능하다 
+@Valid 를 사용하려면 ```implementation 'org.springframework.boot:spring-boot-starter-validation'``` 라이브러리를 추가해야한다
+@Validated 는 스프링 전용 검증 어노테이션이고 @Valid 는 자바표준검증 어노테이션이다 아무거나 사용해도 동일하게 동작하지만
+@Validated 는 내부에 groups 라는 기능을 포훔하고있다.
+
+
+
+# 검증순서
+
+* @ModelAttribute 가 각각 필드에 타입변환시도 (request 온값을 dto 에 넣어주는과정)
+  * 성공하면 다음으로
+  * 실패하면 typeMismatch 가 FieldError 추가
+* Validator 적용
+  바인딩에 성공한 필드만 BeanValidation 적용
+  BeanValidation 는 바인딩에 실패한 필드는 적용하지않는다
+  
+
+
+### BeanValidation 에서 메시지 넣기
+위에서 에러코드와 메시지를 정의한거와 같은방식이다 
+BindingResult 를 찍어보면 전에 익숙한 이름들이 보인다 [NotBlank.item.itemName,NotBlank.itemName,NotBlank.java.lang.String,NotBlank]
+MessageSource 에서 마찬가지로 어노테이션이름인 NotBlank 를 코드로 사용하여 해당하는 코드를 만들어낸다
+똑같이 errors.properties 에 에러코드 정의를하면된다 
+
+### ObjectError 는 어떻게 적용해야할까
+
+```java
+@ScriptAssert(lang = "javascript", script = "_this.price * _this.quantity >= 10000", message = "총합이 10000원 넘게 입력해주세요.")
+```
+JDK 15 이상에는 JavaScript 엔진인 Nashorn 빠져서 사용불가
+
+---
+
+### BeanValidation groups 
+Item.java 와 ValidationItem.java 에서 groups 기능을 추가하여 사용해보았다
+하지만 groups 사용하면 전반적으로 복잡도가 올라간다
+실무에서는 잘사용하지않고 등록용폼 수정용폼으로 나눠서 사용한다.
+
+
+--- 
+# @ModelAttribute vs @RequestBody
+
+HTTP 요청 파라미터를 처리하는 ModelAttribute 는 각각의 필드단위로 세밀하게 적용된다. 그래서 특정필드에 타입이 맞지않는 오류가발생해도 나머지 필드는 정상 처리할수있었다.
+HttpMessageConverter는 ModelAttribute 와 다르게 각각의 필드단위로 적용하는것이아니라, 전체 객체단위로 적용된다 따라서 메시지 컨버터의 작동이 성공해서 Item 객체를 만들어야 이후 검증이 진행된다
+
+* ModelAttribute 는 필드단위로 정교하게 바인딩이 적용된다 특정필드가 바인딩 되지않아도 나머지필드는 정상 바인딩되고 Validator 를 사용한 검증도 적용할수있다
+* RequestBody 는 HttpMessageConverter 단계에서 JSON 데이터를 객체로 변경하지 못하면 이후 단계 자체가 진행되지 않고 예외가 발생한다 컨트롤러 호출도 되지않고 Validator도 적용할수없다.
+
+*** 검증하기전 (@Valid, @Valited) 객체에 바인딩이 완료되어야한다
